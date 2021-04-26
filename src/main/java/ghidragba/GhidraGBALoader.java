@@ -31,6 +31,11 @@ import ghidra.program.model.address.AddressOutOfBoundsException;
 import ghidra.program.model.address.AddressOverflowException;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSpace;
+import ghidra.program.model.data.ArrayDataType;
+import ghidra.program.model.data.ByteDataType;
+import ghidra.program.model.data.StringDataType;
+import ghidra.program.model.data.StructureDataType;
+import ghidra.program.model.data.WordDataType;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
@@ -53,11 +58,11 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 		List<LoadSpec> loadSpecs = new ArrayList<>();
 
 		// Too small to contain header
-		if(provider.length() < 0xc0)
+		if(provider.length() < 0xC0)
 			return loadSpecs;
 
 		// Invalid magic byte
-		if(provider.readByte(0xb2) != (byte)0x96)
+		if(provider.readByte(0xB2) != (byte)0x96)
 			return loadSpecs;
 
 		loadSpecs.add(new LoadSpec(this, 0, new LanguageCompilerSpecPair("ARM:LE:32:v4t", "default"), true));
@@ -90,34 +95,24 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 		FlatProgramAPI api = new FlatProgramAPI(program);
 
 		try {
-			// Memory map
 			MemoryBlock wram = mem.createUninitializedBlock("WRAM", api.toAddr(0x02000000), 0x40000, false);
 			wram.setPermissions(true, true, true);
+		} catch (Exception e) {
+			log.appendException(e);
+		}
 
+		try {
 			MemoryBlock iram = mem.createUninitializedBlock("IRAM", api.toAddr(0x03000000), 0x08000, false);
 			iram.setPermissions(true, true, true);
+		} catch (Exception e) {
+			log.appendException(e);
+		}
 
+		try {
 			MemoryBlock io = mem.createUninitializedBlock("IO", api.toAddr(0x04000000), 0x003ff, false);
 			io.setPermissions(true, true, false);
 			io.setVolatile(true);
 
-			MemoryBlock pal = mem.createUninitializedBlock("PAL", api.toAddr(0x05000000), 0x00400, false);
-			pal.setPermissions(true, true, false);
-
-			MemoryBlock vram = mem.createUninitializedBlock("VRAM", api.toAddr(0x06000000), 0x18000, false);
-			vram.setPermissions(true, true, true);
-
-			MemoryBlock obj = mem.createUninitializedBlock("OBJ", api.toAddr(0x07000000), 0x400, false);
-			obj.setPermissions(true, true, false);
-
-			MemoryBlock rom = mem.createInitializedBlock("ROM", api.toAddr(0x08000000), provider.getInputStream(0), 0x1000000, monitor, false);
-			rom.setPermissions(true, false, true);
-
-			// Entry point
-			api.addEntryPoint(api.toAddr(0x08000000));
-			api.createFunction(api.toAddr(0x08000000), "_entry");
-
-			// Create GBA I/O Map
 			defineIORegister(api, 0x04000000, 2, "DISPCNT");
 			defineIORegister(api, 0x04000002, 2, "GREENSWAP");
 			defineIORegister(api, 0x04000004, 2, "DISPSTAT");
@@ -208,7 +203,7 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 			defineIORegister(api, 0x04000122, 2, "SIOMULTI1");
 			defineIORegister(api, 0x04000124, 2, "SIOMULTI2");
 			defineIORegister(api, 0x04000126, 2, "SIOMULTI3");
-			defineIORegister(api, 0x04000120, 4, "SIODATA32");
+			//defineIORegister(api, 0x04000120, 4, "SIODATA32");
 			defineIORegister(api, 0x04000128, 2, "SIOCNT");
 			defineIORegister(api, 0x0400012A, 2, "SIODATA8");
 			defineIORegister(api, 0x0400012A, 2, "SIOMLT_SEND");
@@ -226,7 +221,57 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 			defineIORegister(api, 0x04000208, 2, "IME");
 			defineIORegister(api, 0x04000300, 1, "POSTFLG");
 			defineIORegister(api, 0x04000301, 1, "HALTCNT");
+		} catch (Exception e) {
+			log.appendException(e);
+		}
 
+		try {
+			MemoryBlock pal = mem.createUninitializedBlock("PAL", api.toAddr(0x05000000), 0x00400, false);
+			pal.setPermissions(true, true, false);
+
+			api.createLabel(api.toAddr(0x05000000), "PAL_BG", true);
+			api.createData(api.toAddr(0x05000000), new ArrayDataType(new WordDataType(), 256, 2));
+
+			api.createLabel(api.toAddr(0x05000200), "PAL_OBJ", true);
+			api.createData(api.toAddr(0x05000200), new ArrayDataType(new WordDataType(), 256, 2));
+		} catch (Exception e) {
+			log.appendException(e);
+		}
+
+		try {
+			MemoryBlock vram = mem.createUninitializedBlock("VRAM", api.toAddr(0x06000000), 0x18000, false);
+			vram.setPermissions(true, true, true);
+		} catch (Exception e) {
+			log.appendException(e);
+		}
+
+		try {
+			MemoryBlock obj = mem.createUninitializedBlock("OBJ", api.toAddr(0x07000000), 0x400, false);
+			obj.setPermissions(true, true, false);
+		} catch (Exception e) {
+			log.appendException(e);
+		}
+
+		try {
+			MemoryBlock rom = mem.createInitializedBlock("ROM", api.toAddr(0x08000000), provider.getInputStream(0), 0x1000000, monitor, false);
+			rom.setPermissions(true, false, true);
+
+			api.addEntryPoint(api.toAddr(0x08000000));
+			api.createFunction(api.toAddr(0x08000000), "_entry");
+
+			StructureDataType header = new StructureDataType("ROM header", 0);
+			header.add(new ArrayDataType(new ByteDataType(), 156, 1), 156, "Nintendo logo", "");
+			header.add(new StringDataType(), 12, "Game title", "");
+			header.add(new StringDataType(), 4, "Game code", "");
+			header.add(new StringDataType(), 2, "Maker code", "");
+			header.add(new ByteDataType(), 1, "Fixed 96h", "");
+			header.add(new ByteDataType(), 1, "Main unit code", "");
+			header.add(new ByteDataType(), 1, "Device type", "");
+			header.add(new ArrayDataType(new ByteDataType(), 7, 1), 7, "Reserved", "");
+			header.add(new ByteDataType(), 1, "Software version", "");
+			header.add(new ByteDataType(), 1, "Complement check", "");
+			header.add(new ArrayDataType(new ByteDataType(), 2, 1), 2, "Reserved", "");
+			api.createData(api.toAddr(0x08000004), header);
 		} catch (Exception e) {
 			log.appendException(e);
 		}
