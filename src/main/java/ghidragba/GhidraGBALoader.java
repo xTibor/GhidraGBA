@@ -65,6 +65,23 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 		return loadSpecs;
 	}
 
+	private void defineIORegister(FlatProgramAPI api, long offset, int size, String name)
+		throws Exception {
+		Address address = api.toAddr(offset);
+		api.createLabel(address, name, true);
+		switch (size) {
+			case 1:
+				api.createByte(address);
+				break;
+			case 2:
+				api.createWord(address);
+				break;
+			case 4:
+				api.createDWord(address);
+				break;
+		}
+	}
+
 	@Override
 	protected void load(ByteProvider provider, LoadSpec loadSpec, List<Option> options,
 			Program program, TaskMonitor monitor, MessageLog log)
@@ -74,133 +91,141 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 
 		try {
 			// Memory map
-			MemoryBlock wram = mem.createUninitializedBlock("WRAM", api.toAddr(0x2000000), 0x40000, false);
+			MemoryBlock wram = mem.createUninitializedBlock("WRAM", api.toAddr(0x02000000), 0x40000, false);
 			wram.setPermissions(true, true, true);
 
-			MemoryBlock iram = mem.createUninitializedBlock("IRAM", api.toAddr(0x3000000), 0x08000, false);
+			MemoryBlock iram = mem.createUninitializedBlock("IRAM", api.toAddr(0x03000000), 0x08000, false);
 			iram.setPermissions(true, true, true);
 
-			MemoryBlock io = mem.createUninitializedBlock("IO", api.toAddr(0x4000000), 0x003ff, false);
+			MemoryBlock io = mem.createUninitializedBlock("IO", api.toAddr(0x04000000), 0x003ff, false);
 			io.setPermissions(true, true, false);
 			io.setVolatile(true);
 
-			MemoryBlock pal = mem.createUninitializedBlock("PAL", api.toAddr(0x5000000), 0x00400, false);
+			MemoryBlock pal = mem.createUninitializedBlock("PAL", api.toAddr(0x05000000), 0x00400, false);
 			pal.setPermissions(true, true, false);
 
-			MemoryBlock vram = mem.createUninitializedBlock("VRAM", api.toAddr(0x6000000), 0x18000, false);
+			MemoryBlock vram = mem.createUninitializedBlock("VRAM", api.toAddr(0x06000000), 0x18000, false);
 			vram.setPermissions(true, true, true);
 
-			MemoryBlock obj = mem.createUninitializedBlock("OBJ", api.toAddr(0x7000000), 0x400, false);
+			MemoryBlock obj = mem.createUninitializedBlock("OBJ", api.toAddr(0x07000000), 0x400, false);
 			obj.setPermissions(true, true, false);
 
-			MemoryBlock rom = mem.createInitializedBlock("ROM", api.toAddr(0x8000000), provider.getInputStream(0), 0x1000000, monitor, false);
+			MemoryBlock rom = mem.createInitializedBlock("ROM", api.toAddr(0x08000000), provider.getInputStream(0), 0x1000000, monitor, false);
 			rom.setPermissions(true, false, true);
 
 			// Entry point
-			api.addEntryPoint(api.toAddr(0x8000000));
-			api.createFunction(api.toAddr(0x8000000), "_entry");
+			api.addEntryPoint(api.toAddr(0x08000000));
+			api.createFunction(api.toAddr(0x08000000), "_entry");
 
 			// Create GBA I/O Map
-			api.createLabel(api.toAddr(0x4000000), "DISPCNT", true);
-			api.createLabel(api.toAddr(0x4000004), "DISPSTAT", true);
-			api.createLabel(api.toAddr(0x4000006), "VCOUNT", true);
-			api.createLabel(api.toAddr(0x4000008), "BG0CNT", true);
-			api.createLabel(api.toAddr(0x400000A), "BG1CNT", true);
-			api.createLabel(api.toAddr(0x400000C), "BG2CNT", true);
-			api.createLabel(api.toAddr(0x400000E), "BG3CNT", true);
-			api.createLabel(api.toAddr(0x4000010), "BG0HOFS", true);
-			api.createLabel(api.toAddr(0x4000012), "BG0VOFS", true);
-			api.createLabel(api.toAddr(0x4000014), "BG1HOFS", true);
-			api.createLabel(api.toAddr(0x4000016), "BG1VOFS", true);
-			api.createLabel(api.toAddr(0x4000018), "BG2HOFS", true);
-			api.createLabel(api.toAddr(0x400001A), "BG2VOFS", true);
-			api.createLabel(api.toAddr(0x400001C), "BG3HOFS", true);
-			api.createLabel(api.toAddr(0x400001E), "BG3VOFS", true);
-			api.createLabel(api.toAddr(0x4000020), "BG2PA", true);
-			api.createLabel(api.toAddr(0x4000022), "BG2PB", true);
-			api.createLabel(api.toAddr(0x4000024), "BG2PC", true);
-			api.createLabel(api.toAddr(0x4000026), "BG2PD", true);
-			api.createLabel(api.toAddr(0x4000028), "BG2X", true);
-			api.createLabel(api.toAddr(0x400002C), "BG2Y", true);
-			api.createLabel(api.toAddr(0x4000030), "BG3PA", true);
-			api.createLabel(api.toAddr(0x4000032), "BG3PB", true);
-			api.createLabel(api.toAddr(0x4000034), "BG3PC", true);
-			api.createLabel(api.toAddr(0x4000036), "BG3PD", true);
-			api.createLabel(api.toAddr(0x4000038), "BG3X", true);
-			api.createLabel(api.toAddr(0x400003C), "BG3Y", true);
-			api.createLabel(api.toAddr(0x4000040), "WIN0H", true);
-			api.createLabel(api.toAddr(0x4000042), "WIN1H", true);
-			api.createLabel(api.toAddr(0x4000044), "WIN0V", true);
-			api.createLabel(api.toAddr(0x4000046), "WIN1V", true);
-			api.createLabel(api.toAddr(0x4000048), "WININ", true);
-			api.createLabel(api.toAddr(0x400004A), "WINOUT", true);
-			api.createLabel(api.toAddr(0x400004C), "MOSAIC", true);
-			api.createLabel(api.toAddr(0x4000050), "BLDCNT", true);
-			api.createLabel(api.toAddr(0x4000052), "BLDALPHA", true);
-			api.createLabel(api.toAddr(0x4000054), "BLDY", true);
-			api.createLabel(api.toAddr(0x4000060), "SOUND1CNT_L", true);
-			api.createLabel(api.toAddr(0x4000062), "SOUND1CNT_H", true);
-			api.createLabel(api.toAddr(0x4000064), "SOUND1CNT_X", true);
-			api.createLabel(api.toAddr(0x4000068), "SOUND2CNT_L", true);
-			api.createLabel(api.toAddr(0x400006C), "SOUND2CNT_H", true);
-			api.createLabel(api.toAddr(0x4000070), "SOUND3CNT_L", true);
-			api.createLabel(api.toAddr(0x4000072), "SOUND3CNT_H", true);
-			api.createLabel(api.toAddr(0x4000074), "SOUND3CNT_X", true);
-			api.createLabel(api.toAddr(0x4000078), "SOUND4CNT_L", true);
-			api.createLabel(api.toAddr(0x400007C), "SOUND4CNT_H", true);
-			api.createLabel(api.toAddr(0x4000080), "SOUNDCNT_L", true);
-			api.createLabel(api.toAddr(0x4000082), "SOUNDCNT_H", true);
-			api.createLabel(api.toAddr(0x4000084), "SOUNDCNT_X", true);
-			api.createLabel(api.toAddr(0x4000088), "SOUNDBIAS", true);
-			api.createLabel(api.toAddr(0x4000090), "WAVE_RAM", true);
-			api.createLabel(api.toAddr(0x40000A0), "FIFO_A", true);
-			api.createLabel(api.toAddr(0x40000A4), "FIFO_B", true);
-			api.createLabel(api.toAddr(0x40000B0), "DMA0SAD", true);
-			api.createLabel(api.toAddr(0x40000B4), "DMA0DAD", true);
-			api.createLabel(api.toAddr(0x40000B8), "DMA0CNT_L", true);
-			api.createLabel(api.toAddr(0x40000BA), "DMA0CNT_H", true);
-			api.createLabel(api.toAddr(0x40000BC), "DMA1SAD", true);
-			api.createLabel(api.toAddr(0x40000C0), "DMA1DAD", true);
-			api.createLabel(api.toAddr(0x40000C4), "DMA1CNT_L", true);
-			api.createLabel(api.toAddr(0x40000C6), "DMA1CNT_H", true);
-			api.createLabel(api.toAddr(0x40000C8), "DMA2SAD", true);
-			api.createLabel(api.toAddr(0x40000CC), "DMA2DAD", true);
-			api.createLabel(api.toAddr(0x40000D0), "DMA2CNT_L", true);
-			api.createLabel(api.toAddr(0x40000D2), "DMA2CNT_H", true);
-			api.createLabel(api.toAddr(0x40000D4), "DMA3SAD", true);
-			api.createLabel(api.toAddr(0x40000D8), "DMA3DAD", true);
-			api.createLabel(api.toAddr(0x40000DC), "DMA3CNT_L", true);
-			api.createLabel(api.toAddr(0x40000DE), "DMA3CNT_H", true);
-			api.createLabel(api.toAddr(0x4000100), "TM0CNT_L", true);
-			api.createLabel(api.toAddr(0x4000102), "TM0CNT_H", true);
-			api.createLabel(api.toAddr(0x4000104), "TM1CNT_L", true);
-			api.createLabel(api.toAddr(0x4000106), "TM1CNT_H", true);
-			api.createLabel(api.toAddr(0x4000108), "TM2CNT_L", true);
-			api.createLabel(api.toAddr(0x400010A), "TM2CNT_H", true);
-			api.createLabel(api.toAddr(0x400010C), "TM3CNT_L", true);
-			api.createLabel(api.toAddr(0x400010E), "TM3CNT_H", true);
-			api.createLabel(api.toAddr(0x4000120), "SIODATA32", true);
-			api.createLabel(api.toAddr(0x4000120), "SIOMULTI0", true);
-			api.createLabel(api.toAddr(0x4000122), "SIOMULTI1", true);
-			api.createLabel(api.toAddr(0x4000124), "SIOMULTI2", true);
-			api.createLabel(api.toAddr(0x4000126), "SIOMULTI3", true);
-			api.createLabel(api.toAddr(0x4000128), "SIOCNT", true);
-			api.createLabel(api.toAddr(0x400012A), "SIOMLT_SEND", true);
-			api.createLabel(api.toAddr(0x400012A), "SIODATA8", true);
-			api.createLabel(api.toAddr(0x4000130), "KEYINPUT", true);
-			api.createLabel(api.toAddr(0x4000132), "KEYCNT", true);
-			api.createLabel(api.toAddr(0x4000200), "IE", true);
-			api.createLabel(api.toAddr(0x4000202), "IF", true);
-			api.createLabel(api.toAddr(0x4000204), "WAITCNT", true);
-			api.createLabel(api.toAddr(0x4000208), "IME", true);
-			api.createLabel(api.toAddr(0x4000300), "POSTFLG", true);
-			api.createLabel(api.toAddr(0x4000301), "HALTCNT", true);
-			api.createLabel(api.toAddr(0x4000134), "RCNT", true);
-			api.createLabel(api.toAddr(0x4000136), "IR", true);
-			api.createLabel(api.toAddr(0x4000140), "JOYCNT", true);
-			api.createLabel(api.toAddr(0x4000150), "JOY_RECV", true);
-			api.createLabel(api.toAddr(0x4000154), "JOY_TRANS", true);
-			api.createLabel(api.toAddr(0x4000158), "JOYSTAT", true);
+			defineIORegister(api, 0x04000000, 2, "DISPCNT");
+			defineIORegister(api, 0x04000002, 2, "GREENSWAP");
+			defineIORegister(api, 0x04000004, 2, "DISPSTAT");
+			defineIORegister(api, 0x04000006, 2, "VCOUNT");
+			defineIORegister(api, 0x04000008, 2, "BG0CNT");
+			defineIORegister(api, 0x0400000A, 2, "BG1CNT");
+			defineIORegister(api, 0x0400000C, 2, "BG2CNT");
+			defineIORegister(api, 0x0400000E, 2, "BG3CNT");
+			defineIORegister(api, 0x04000010, 2, "BG0HOFS");
+			defineIORegister(api, 0x04000012, 2, "BG0VOFS");
+			defineIORegister(api, 0x04000014, 2, "BG1HOFS");
+			defineIORegister(api, 0x04000016, 2, "BG1VOFS");
+			defineIORegister(api, 0x04000018, 2, "BG2HOFS");
+			defineIORegister(api, 0x0400001A, 2, "BG2VOFS");
+			defineIORegister(api, 0x0400001C, 2, "BG3HOFS");
+			defineIORegister(api, 0x0400001E, 2, "BG3VOFS");
+			defineIORegister(api, 0x04000020, 2, "BG2PA");
+			defineIORegister(api, 0x04000022, 2, "BG2PB");
+			defineIORegister(api, 0x04000024, 2, "BG2PC");
+			defineIORegister(api, 0x04000026, 2, "BG2PD");
+			defineIORegister(api, 0x04000028, 4, "BG2X");
+			defineIORegister(api, 0x0400002C, 4, "BG2Y");
+			defineIORegister(api, 0x04000030, 2, "BG3PA");
+			defineIORegister(api, 0x04000032, 2, "BG3PB");
+			defineIORegister(api, 0x04000034, 2, "BG3PC");
+			defineIORegister(api, 0x04000036, 2, "BG3PD");
+			defineIORegister(api, 0x04000038, 4, "BG3X");
+			defineIORegister(api, 0x0400003C, 4, "BG3Y");
+			defineIORegister(api, 0x04000040, 2, "WIN0H");
+			defineIORegister(api, 0x04000042, 2, "WIN1H");
+			defineIORegister(api, 0x04000044, 2, "WIN0V");
+			defineIORegister(api, 0x04000046, 2, "WIN1V");
+			defineIORegister(api, 0x04000048, 2, "WININ");
+			defineIORegister(api, 0x0400004A, 2, "WINOUT");
+			defineIORegister(api, 0x0400004C, 2, "MOSAIC");
+			defineIORegister(api, 0x04000050, 2, "BLDCNT");
+			defineIORegister(api, 0x04000052, 2, "BLDALPHA");
+			defineIORegister(api, 0x04000054, 2, "BLDY");
+			defineIORegister(api, 0x04000060, 2, "SOUND1CNT_L");
+			defineIORegister(api, 0x04000062, 2, "SOUND1CNT_H");
+			defineIORegister(api, 0x04000064, 2, "SOUND1CNT_X");
+			defineIORegister(api, 0x04000068, 2, "SOUND2CNT_L");
+			defineIORegister(api, 0x0400006C, 2, "SOUND2CNT_H");
+			defineIORegister(api, 0x04000070, 2, "SOUND3CNT_L");
+			defineIORegister(api, 0x04000072, 2, "SOUND3CNT_H");
+			defineIORegister(api, 0x04000074, 2, "SOUND3CNT_X");
+			defineIORegister(api, 0x04000078, 2, "SOUND4CNT_L");
+			defineIORegister(api, 0x0400007C, 2, "SOUND4CNT_H");
+			defineIORegister(api, 0x04000080, 2, "SOUNDCNT_L");
+			defineIORegister(api, 0x04000082, 2, "SOUNDCNT_H");
+			defineIORegister(api, 0x04000084, 2, "SOUNDCNT_X");
+			defineIORegister(api, 0x04000088, 2, "SOUNDBIAS");
+			defineIORegister(api, 0x04000090, 2, "WAVE_RAM0_L");
+			defineIORegister(api, 0x04000092, 2, "WAVE_RAM0_H");
+			defineIORegister(api, 0x04000094, 2, "WAVE_RAM1_L");
+			defineIORegister(api, 0x04000096, 2, "WAVE_RAM1_H");
+			defineIORegister(api, 0x04000098, 2, "WAVE_RAM2_L");
+			defineIORegister(api, 0x0400009A, 2, "WAVE_RAM2_H");
+			defineIORegister(api, 0x0400009C, 2, "WAVE_RAM3_L");
+			defineIORegister(api, 0x0400009E, 2, "WAVE_RAM3_H");
+			defineIORegister(api, 0x040000A0, 4, "FIFO_A");
+			defineIORegister(api, 0x040000A4, 4, "FIFO_B");
+			defineIORegister(api, 0x040000B0, 4, "DMA0SAD");
+			defineIORegister(api, 0x040000B4, 4, "DMA0DAD");
+			defineIORegister(api, 0x040000B8, 2, "DMA0CNT_L");
+			defineIORegister(api, 0x040000BA, 2, "DMA0CNT_H");
+			defineIORegister(api, 0x040000BC, 4, "DMA1SAD");
+			defineIORegister(api, 0x040000C0, 4, "DMA1DAD");
+			defineIORegister(api, 0x040000C4, 2, "DMA1CNT_L");
+			defineIORegister(api, 0x040000C6, 2, "DMA1CNT_H");
+			defineIORegister(api, 0x040000C8, 4, "DMA2SAD");
+			defineIORegister(api, 0x040000CC, 4, "DMA2DAD");
+			defineIORegister(api, 0x040000D0, 2, "DMA2CNT_L");
+			defineIORegister(api, 0x040000D2, 2, "DMA2CNT_H");
+			defineIORegister(api, 0x040000D4, 4, "DMA3SAD");
+			defineIORegister(api, 0x040000D8, 4, "DMA3DAD");
+			defineIORegister(api, 0x040000DC, 2, "DMA3CNT_L");
+			defineIORegister(api, 0x040000DE, 2, "DMA3CNT_H");
+			defineIORegister(api, 0x04000100, 2, "TM0CNT_L");
+			defineIORegister(api, 0x04000102, 2, "TM0CNT_H");
+			defineIORegister(api, 0x04000104, 2, "TM1CNT_L");
+			defineIORegister(api, 0x04000106, 2, "TM1CNT_H");
+			defineIORegister(api, 0x04000108, 2, "TM2CNT_L");
+			defineIORegister(api, 0x0400010A, 2, "TM2CNT_H");
+			defineIORegister(api, 0x0400010C, 2, "TM3CNT_L");
+			defineIORegister(api, 0x0400010E, 2, "TM3CNT_H");
+			defineIORegister(api, 0x04000120, 2, "SIOMULTI0");
+			defineIORegister(api, 0x04000122, 2, "SIOMULTI1");
+			defineIORegister(api, 0x04000124, 2, "SIOMULTI2");
+			defineIORegister(api, 0x04000126, 2, "SIOMULTI3");
+			defineIORegister(api, 0x04000120, 4, "SIODATA32");
+			defineIORegister(api, 0x04000128, 2, "SIOCNT");
+			defineIORegister(api, 0x0400012A, 2, "SIODATA8");
+			defineIORegister(api, 0x0400012A, 2, "SIOMLT_SEND");
+			defineIORegister(api, 0x04000130, 2, "KEYINPUT");
+			defineIORegister(api, 0x04000132, 2, "KEYCNT");
+			defineIORegister(api, 0x04000134, 2, "RCNT");
+			defineIORegister(api, 0x04000136, 2, "IR"); // 2?
+			defineIORegister(api, 0x04000140, 2, "JOYCNT");
+			defineIORegister(api, 0x04000150, 4, "JOY_RECV");
+			defineIORegister(api, 0x04000154, 4, "JOY_TRANS");
+			defineIORegister(api, 0x04000158, 2, "JOYSTAT");
+			defineIORegister(api, 0x04000200, 2, "IE");
+			defineIORegister(api, 0x04000202, 2, "IF");
+			defineIORegister(api, 0x04000204, 2, "WAITCNT");
+			defineIORegister(api, 0x04000208, 2, "IME");
+			defineIORegister(api, 0x04000300, 1, "POSTFLG");
+			defineIORegister(api, 0x04000301, 1, "HALTCNT");
 
 		} catch (Exception e) {
 			log.appendException(e);
