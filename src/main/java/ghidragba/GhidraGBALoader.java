@@ -4,9 +4,9 @@
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,6 +34,7 @@ import ghidra.program.model.address.AddressSpace;
 import ghidra.program.model.lang.LanguageCompilerSpecPair;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.Memory;
+import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.mem.MemoryConflictException;
 import ghidra.program.model.symbol.SourceType;
 import ghidra.util.exception.CancelledException;
@@ -50,15 +51,15 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 	@Override
 	public Collection<LoadSpec> findSupportedLoadSpecs(ByteProvider provider) throws IOException {
 		List<LoadSpec> loadSpecs = new ArrayList<>();
-		
+
 		// Too small to contain header
 		if(provider.length() < 0xc0)
 			return loadSpecs;
-		
+
 		// Invalid magic byte
 		if(provider.readByte(0xb2) != (byte)0x96)
 			return loadSpecs;
-		
+
 		loadSpecs.add(new LoadSpec(this, 0, new LanguageCompilerSpecPair("ARM:LE:32:v4t", "default"), true));
 
 		return loadSpecs;
@@ -70,20 +71,36 @@ public class GhidraGBALoader extends AbstractLibrarySupportLoader {
 			throws CancelledException, IOException {
 		Memory mem = program.getMemory();
 		FlatProgramAPI api = new FlatProgramAPI(program);
-				
+
 		try {
-			mem.createUninitializedBlock("WRAM", api.toAddr(0x2000000), 0x40000, false).setExecute(true);
-			mem.createUninitializedBlock("IRAM", api.toAddr(0x3000000), 0x08000, false).setExecute(true);
-			mem.createUninitializedBlock("IO", api.toAddr(0x4000000), 0x003ff, false).setWrite(true);
-			mem.createUninitializedBlock("PAL", api.toAddr(0x5000000), 0x00400, false).setWrite(true);
-			mem.createUninitializedBlock("VRAM", api.toAddr(0x6000000), 0x18000, false).setExecute(true);
-			mem.createUninitializedBlock("OBJ", api.toAddr(0x7000000), 0x400, false).setExecute(true);
-			mem.createInitializedBlock("ROM", api.toAddr(0x8000000), provider.getInputStream(0), 0x1000000, monitor, false).setExecute(true);
-			
+			// Memory map
+			MemoryBlock wram = mem.createUninitializedBlock("WRAM", api.toAddr(0x2000000), 0x40000, false);
+			wram.setPermissions(true, true, true);
+
+			MemoryBlock iram = mem.createUninitializedBlock("IRAM", api.toAddr(0x3000000), 0x08000, false);
+			iram.setPermissions(true, true, true);
+
+			MemoryBlock io = mem.createUninitializedBlock("IO", api.toAddr(0x4000000), 0x003ff, false);
+			io.setPermissions(true, true, false);
+			io.setVolatile(true);
+
+			MemoryBlock pal = mem.createUninitializedBlock("PAL", api.toAddr(0x5000000), 0x00400, false);
+			pal.setPermissions(true, true, false);
+
+			MemoryBlock vram = mem.createUninitializedBlock("VRAM", api.toAddr(0x6000000), 0x18000, false);
+			vram.setPermissions(true, true, true);
+
+			MemoryBlock obj = mem.createUninitializedBlock("OBJ", api.toAddr(0x7000000), 0x400, false);
+			obj.setPermissions(true, true, false);
+
+			MemoryBlock rom = mem.createInitializedBlock("ROM", api.toAddr(0x8000000), provider.getInputStream(0), 0x1000000, monitor, false);
+			rom.setPermissions(true, false, true);
+
+			// Entry point
 			api.addEntryPoint(api.toAddr(0x8000000));
 			api.createFunction(api.toAddr(0x8000000), "_entry");
-			
-			// Create GBA I/O Map			
+
+			// Create GBA I/O Map
 			api.createLabel(api.toAddr(0x4000000), "DISPCNT", true);
 			api.createLabel(api.toAddr(0x4000004), "DISPSTAT", true);
 			api.createLabel(api.toAddr(0x4000006), "VCOUNT", true);
